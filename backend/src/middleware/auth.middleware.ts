@@ -5,7 +5,7 @@ import { prisma } from '../database';
 import { createDataLoaders } from '../services/dataloader.service';
 
 export const createContext = async ({ req, res }: any): Promise<GraphQLContext> => {
-  let user = null;
+  let user: any = null;
 
   // Try to get token from cookies or Authorization header
   const token = req.cookies?.token ?? req.headers.authorization?.replace('Bearer ', '');
@@ -31,7 +31,7 @@ export const createContext = async ({ req, res }: any): Promise<GraphQLContext> 
 
 // For WebSocket subscriptions
 export const createSubscriptionContext = async ({ connectionParams }: any) => {
-  let user = null;
+  let user: any = null;
 
   const token = connectionParams?.authorization?.replace('Bearer ', '') ?? 
                 connectionParams?.token ??
