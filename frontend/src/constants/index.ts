@@ -18,6 +18,8 @@ export const TOAST_CONFIG = {
   MAX_TOASTS: 5,
 } as const;
 
+export type ToastType = "success" | "error" | "warning" | "info";
+
 // Error Messages
 export const ERROR_MESSAGES = {
   NETWORK_ERROR: "Network error. Please check your connection.",

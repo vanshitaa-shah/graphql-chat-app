@@ -19,9 +19,9 @@ interface ToastContextType {
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
 // Global toast function that can be called from anywhere
-let globalAddToast: ((message: string, type: Toast['type']) => void) | null = null;
+let globalAddToast: ((message: string, type: ToastType) => void) | null = null;
 
-export const showGlobalToast = (message: string, type: Toast['type']) => {
+export const showGlobalToast = (message: string, type: ToastType) => {
   if (globalAddToast) {
     globalAddToast(message, type);
   } else {
@@ -123,7 +123,7 @@ const ToastContainer = ({ toasts, onRemove }: ToastContainerProps) => {
       warning: <AlertTriangle className="w-5 h-5" />,
       info: <Info className="w-5 h-5" />,
     };
-    return iconMap[type] || <Info className="w-5 h-5" />;
+    return iconMap[type as keyof typeof iconMap] || <Info className="w-5 h-5" />;
   };
 
   return (
