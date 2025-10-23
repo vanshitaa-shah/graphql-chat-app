@@ -71,16 +71,27 @@ async function startServer() {
 
   // Start the server
   await server.start();
-
-  // Apply the Apollo GraphQL middleware
-  const corsOrigins = process.env.NODE_ENV === 'production' 
-    ? (process.env.CORS_ORIGINS?.split(',') || ['https://your-frontend-domain.com'])
-    : ['http://localhost:3000', 'http://localhost:5173'];
+  
+  // Configure CORS origins
+  const corsOrigins = [
+    "http://localhost:5173",
+    "https://chat-graphql-app.netlify.app"
+  ];
 
   app.use(
     '/graphql',
     cors({
-      origin: corsOrigins,
+      origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        if (corsOrigins.includes(origin)) {
+          callback(null, true);
+        } else {
+          console.warn(`🚫 Blocked request from origin: ${origin}`);
+          callback(new Error('Not allowed by CORS'));
+        }
+      },
       credentials: true,
     }),
     cookieParser(),
