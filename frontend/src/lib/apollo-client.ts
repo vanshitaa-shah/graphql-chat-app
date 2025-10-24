@@ -19,6 +19,17 @@ const wsLink = new GraphQLWsLink(createClient({
   connectionParams: () => ({
     authorization: localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : '',
   }),
+  shouldRetry: () => true,
+  retryAttempts: 5,
+  retryWait: async (attempt) => {
+    console.log(`🔄 WebSocket reconnection attempt ${attempt}`);
+    await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
+  },
+  on: {
+    connected: () => console.log('🟢 WebSocket connected successfully'),
+    closed: (event) => console.log('🔴 WebSocket connection closed:', event),
+    error: (error) => console.error('❌ WebSocket error:', error),
+  },
 }));
 
 // Auth link to add token to headers
@@ -79,6 +90,7 @@ export const client = new ApolloClient({
     },
     mutate: {
       errorPolicy: 'all',
+      fetchPolicy: 'no-cache', // Don't cache mutations to avoid stale optimistic responses
     },
   },
 });

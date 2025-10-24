@@ -5,6 +5,7 @@ import {
   MESSAGES_QUERY,
   SEND_MESSAGE_MUTATION,
   MESSAGE_ADDED_SUBSCRIPTION,
+  type MessagesQuery,
 } from "../graphql/operations";
 import { useAuth } from "../hooks/useAuth";
 import { ChatSidebar } from "./ChatSidebar";
@@ -36,7 +37,6 @@ export const Chat = () => {
   const {
     data: messagesData,
     loading: messagesLoading,
-    refetch: refetchMessages,
   } = useQuery(MESSAGES_QUERY, {
     variables: { roomId: selectedRoomId },
     skip: !selectedRoomId,
@@ -53,9 +53,31 @@ export const Chat = () => {
   useSubscription(MESSAGE_ADDED_SUBSCRIPTION, {
     variables: { roomId: selectedRoomId },
     skip: !selectedRoomId,
-    onData: () => {
-      if (selectedRoomId && refetchMessages) {
-        refetchMessages();
+    onData: ({ data, client }) => {
+      if (data?.data?.messageAdded && selectedRoomId) {
+        // Update cache with the new message from subscription
+        const existingMessages = client.readQuery<MessagesQuery>({
+          query: MESSAGES_QUERY,
+          variables: { roomId: selectedRoomId },
+        });
+
+        if (existingMessages?.messages) {
+          const messageExists = existingMessages.messages.some(
+            (msg) => msg.id === data.data.messageAdded.id
+          );
+
+          // Only add if not already in cache (prevents duplicates)
+          if (!messageExists) {
+            client.writeQuery({
+              query: MESSAGES_QUERY,
+              variables: { roomId: selectedRoomId },
+              data: {
+                messages: [...existingMessages.messages, data.data.messageAdded],
+              },
+            });
+          }
+        }
+
         setTimeout(() => {
           // Scroll will be handled by MessageList component
         }, 200);
@@ -83,7 +105,7 @@ export const Chat = () => {
   }, [rooms, selectedRoomId]);
 
   const handleSendMessage = async (message: string) => {
-    if (!selectedRoomId) return;
+    if (!selectedRoomId || !user) return;
 
     try {
       await sendMessage({
@@ -93,17 +115,60 @@ export const Chat = () => {
             content: message,
           },
         },
-        refetchQueries: [
-          {
+        optimisticResponse: {
+          sendMessage: {
+            __typename: 'MessageResponse',
+            message: {
+              __typename: 'Message',
+              id: `temp-${Date.now()}`,
+              content: message,
+              createdAt: new Date().toISOString(),
+              user: {
+                __typename: 'User',
+                id: user.id,
+                username: user.username,
+              },
+              room: {
+                __typename: 'Room',
+                id: selectedRoomId,
+                name: selectedRoom?.name || '',
+              },
+            },
+          },
+        },
+        update: (cache, { data }) => {
+          if (!data?.sendMessage?.message) return;
+
+          const newMessage = data.sendMessage.message;
+
+          // Read the current messages from cache
+          const existingMessages = cache.readQuery<MessagesQuery>({
             query: MESSAGES_QUERY,
             variables: { roomId: selectedRoomId },
-          },
-        ],
-        awaitRefetchQueries: false,
+          });
+
+          if (existingMessages?.messages) {
+            // Only add the message if it's not already in the cache (avoid duplicates from subscription)
+            const messageExists = existingMessages.messages.some(
+              (msg) => msg.id === newMessage.id
+            );
+
+            if (!messageExists) {
+              cache.writeQuery({
+                query: MESSAGES_QUERY,
+                variables: { roomId: selectedRoomId },
+                data: {
+                  messages: [...existingMessages.messages, newMessage],
+                },
+              });
+            } else {
+              // Message already exists, skip
+            }
+          }
+        },
       });
-    } catch (error) {
+    } catch {
       // Error will be handled by Apollo Client
-      console.error("Send message error:", error);
     }
   };
 
